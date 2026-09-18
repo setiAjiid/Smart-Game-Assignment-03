@@ -3,11 +3,9 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// <summary>
-/// Menu: Tools > Steering > Build Demo Scene
-/// Membangun arena demo di scene yang sedang terbuka:
-/// Ground, dinding + obstacle (layer "Obstacle"), Player, NPC, dan kamera.
-/// </summary>
+// menu Tools > Steering > Build Demo Scene
+// bikin arena demo di scene yg lagi kebuka: ground, tembok, obstacle, player, npc, kamera
+// biar ga usah drag drop manual satu satu
 public static class SteeringSceneBuilder
 {
     const string ObstacleLayerName = "Obstacle";
@@ -19,11 +17,11 @@ public static class SteeringSceneBuilder
         int obstacleLayer = EnsureLayer(ObstacleLayerName);
         if (obstacleLayer < 0)
         {
-            Debug.LogError("Gagal membuat layer Obstacle. Buat manual di Project Settings > Tags and Layers.");
+            Debug.LogError("gagal bikin layer Obstacle, bikin manual aja di Project Settings > Tags and Layers");
             return;
         }
 
-        // Hapus arena lama kalau sudah ada supaya bisa di-rebuild
+        // kalo udah pernah dibuild, hapus dulu yg lama
         var old = GameObject.Find("SteeringDemo");
         if (old != null) Undo.DestroyObjectImmediate(old);
 
@@ -35,14 +33,14 @@ public static class SteeringSceneBuilder
         Material playerMat = GetOrCreateMaterial("M_Player", new Color(0.2f, 0.5f, 1f));
         Material npcMat = GetOrCreateMaterial("M_NPC", new Color(0.2f, 0.8f, 0.3f));
 
-        // ---------- Ground ----------
+        // ground
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.name = "Ground";
         ground.transform.SetParent(root.transform);
-        ground.transform.localScale = new Vector3(4f, 1f, 4f);   // 40 x 40 unit
+        ground.transform.localScale = new Vector3(4f, 1f, 4f);   // jadi 40x40
         ground.GetComponent<Renderer>().sharedMaterial = groundMat;
 
-        // ---------- Dinding arena (Obstacle) ----------
+        // tembok keliling arena, masuk layer obstacle biar npc ga keluar
         var walls = new GameObject("Walls"); walls.transform.SetParent(root.transform);
         float half = 20f, wallH = 2f, wallT = 1f;
         MakeBox(walls.transform, "Wall_N", new Vector3(0, wallH / 2, half), new Vector3(2 * half + wallT, wallH, wallT), obstacleMat, obstacleLayer);
@@ -50,7 +48,7 @@ public static class SteeringSceneBuilder
         MakeBox(walls.transform, "Wall_E", new Vector3(half, wallH / 2, 0), new Vector3(wallT, wallH, 2 * half + wallT), obstacleMat, obstacleLayer);
         MakeBox(walls.transform, "Wall_W", new Vector3(-half, wallH / 2, 0), new Vector3(wallT, wallH, 2 * half + wallT), obstacleMat, obstacleLayer);
 
-        // ---------- Obstacle di tengah arena ----------
+        // obstacle di tengah
         var obstacles = new GameObject("Obstacles"); obstacles.transform.SetParent(root.transform);
         MakeBox(obstacles.transform, "Box_1", new Vector3(0, 1, 5), new Vector3(2, 2, 2), obstacleMat, obstacleLayer);
         MakeBox(obstacles.transform, "Box_2", new Vector3(-6, 1, -3), new Vector3(3, 2, 1.5f), obstacleMat, obstacleLayer);
@@ -60,7 +58,7 @@ public static class SteeringSceneBuilder
         MakeCylinder(obstacles.transform, "Pillar_2", new Vector3(10, 1, 3), 1.5f, obstacleMat, obstacleLayer);
         MakeCylinder(obstacles.transform, "Pillar_3", new Vector3(-3, 1, -10), 1f, obstacleMat, obstacleLayer);
 
-        // ---------- Player ----------
+        // player
         var player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         player.name = "Player";
         player.transform.SetParent(root.transform);
@@ -70,10 +68,10 @@ public static class SteeringSceneBuilder
         var cc = player.AddComponent<CharacterController>();
         cc.center = Vector3.zero; cc.height = 2f; cc.radius = 0.5f;
         player.AddComponent<SimplePlayerController>();
-        // "hidung" supaya arah hadap terlihat
+        // kasih hidung biar keliatan ngadep ke mana
         MakeNose(player.transform, playerMat);
 
-        // ---------- NPC ----------
+        // npc
         var npc = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         npc.name = "NPC_SteeringAgent";
         npc.transform.SetParent(root.transform);
@@ -88,7 +86,7 @@ public static class SteeringSceneBuilder
         agent.target = player.transform;
         MakeNose(npc.transform, npcMat);
 
-        // ---------- Kamera ----------
+        // kamera dari atas agak miring
         var cam = Camera.main;
         if (cam != null)
         {
@@ -98,10 +96,10 @@ public static class SteeringSceneBuilder
 
         Selection.activeGameObject = npc;
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-        Debug.Log("Steering demo scene dibangun. Tekan Play, gerakkan Player dengan WASD.");
+        Debug.Log("scene demo udah jadi, tinggal play terus gerakin player pake wasd");
     }
 
-    // ---------------- helpers ----------------
+    // helper
 
     static void MakeBox(Transform parent, string name, Vector3 pos, Vector3 size, Material mat, int layer)
     {
@@ -153,7 +151,7 @@ public static class SteeringSceneBuilder
         return mat;
     }
 
-    /// <summary>Menambahkan layer ke TagManager jika belum ada. Return index layer.</summary>
+    // nambahin layer ke TagManager kalo belum ada, balikin index layernya
     static int EnsureLayer(string layerName)
     {
         int existing = LayerMask.NameToLayer(layerName);
@@ -161,7 +159,7 @@ public static class SteeringSceneBuilder
 
         var tagManager = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
         var layers = tagManager.FindProperty("layers");
-        for (int i = 8; i < layers.arraySize; i++)   // 0-7 builtin
+        for (int i = 8; i < layers.arraySize; i++)   // 0-7 udah dipake unity
         {
             var element = layers.GetArrayElementAtIndex(i);
             if (string.IsNullOrEmpty(element.stringValue))

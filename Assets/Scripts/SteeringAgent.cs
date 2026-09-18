@@ -1,16 +1,7 @@
 using UnityEngine;
 
-/// <summary>
-/// Autonomous Steering Agent.
-///
-/// Pipeline tiap frame:
-///   Steering Behavior (Arrive / Wander / Flee)
-///     -> Desired Velocity (+ Avoidance * weight)
-///     -> Steering = Desired - Velocity, dibatasi Max Acceleration
-///     -> Velocity += Steering * dt, dibatasi Max Speed
-///     -> Movement  (position += Velocity * dt)
-///     -> Rotation  (menghadap arah Velocity)
-/// </summary>
+// npc steering agent
+// alurnya tiap frame: behavior -> desired velocity -> acceleration -> velocity -> gerak -> rotasi
 [RequireComponent(typeof(SteeringSensor))]
 public class SteeringAgent : MonoBehaviour
 {
@@ -18,50 +9,38 @@ public class SteeringAgent : MonoBehaviour
 
     [Header("Target")]
     public Transform target;
-    [Tooltip("true = Arrive ke target, false = Wander")]
-    public bool useTarget = true;
+    public bool useTarget = true;   // true = arrive ke player, false = wander
 
     [Header("Movement")]
-    [Tooltip("Kecepatan maksimum NPC")]
-    public float maxSpeed = 4f;
-    [Tooltip("Seberapa cepat velocity boleh berubah per detik (efek inersia)")]
-    public float maxAcceleration = 8f;
-    [Tooltip("Kecepatan rotasi menghadap arah gerak")]
-    public float turnSpeed = 6f;
+    public float maxSpeed = 4f;          // kecepatan maksimal
+    public float maxAcceleration = 8f;   // batas perubahan velocity per detik, ini yg bikin ada inersia
+    public float turnSpeed = 6f;         // kecepatan muter ngadep arah gerak
 
     [Header("Arrive")]
-    [Tooltip("Jarak mulai melambat")]
-    public float slowRadius = 5f;
-    [Tooltip("Jarak NPC berhenti dari target")]
-    public float stopRadius = 1.5f;
+    public float slowRadius = 5f;   // mulai ngerem
+    public float stopRadius = 1.5f; // berhenti
 
     [Header("Wander")]
-    [Tooltip("Kecepatan saat wandering")]
     public float wanderSpeed = 2f;
-    [Tooltip("Frekuensi perubahan arah (detik)")]
-    public float wanderChangeInterval = 1.5f;
-    [Tooltip("Besar sudut perubahan arah maksimum (derajat)")]
-    public float wanderAngleChange = 60f;
+    public float wanderChangeInterval = 1.5f; // tiap berapa detik ganti arah
+    public float wanderAngleChange = 60f;     // maksimal ganti arah berapa derajat
 
     [Header("Avoidance")]
-    [Tooltip("Prioritas menghindar dibanding desired velocity")]
-    public float avoidanceWeight = 2f;
+    public float avoidanceWeight = 2f; // seberapa diprioritasin ngehindar dibanding desired velocity
 
     [Header("Pengembangan: Flee")]
-    [Tooltip("Aktifkan Flee saat Player terlalu dekat")]
     public bool enableFlee = false;
-    [Tooltip("Jarak Player dianggap terlalu dekat")]
-    public float fleeRadius = 2f;
+    public float fleeRadius = 2f; // kalo player lebih deket dari ini npc kabur
 
     [Header("Pengembangan: Warna per Behavior")]
     public bool changeColor = true;
-    public Color arriveColor = new Color(0.2f, 0.8f, 0.3f);   // hijau
+    public Color arriveColor = new Color(0.2f, 0.8f, 0.3f);   // ijo
     public Color wanderColor = new Color(0.3f, 0.5f, 1f);     // biru
     public Color avoidingColor = new Color(1f, 0.3f, 0.2f);   // merah
     public Color fleeColor = new Color(1f, 0.85f, 0.2f);      // kuning
     public Color idleColor = Color.gray;
 
-    [Header("Debug (read-only)")]
+    [Header("Debug")]
     [SerializeField] BehaviorState currentState;
     [SerializeField] Vector3 velocity;
     [SerializeField] Vector3 desiredVelocity;
@@ -72,7 +51,7 @@ public class SteeringAgent : MonoBehaviour
 
     SteeringSensor sensor;
     Renderer rend;
-    float wanderAngle;      // heading wander dalam derajat (sumbu Y)
+    float wanderAngle;  // heading wander, derajat di sumbu y
     float wanderTimer;
 
     void Awake()
@@ -86,7 +65,7 @@ public class SteeringAgent : MonoBehaviour
     {
         float dt = Time.deltaTime;
 
-        // ---------- 1. Steering Behavior -> Desired Velocity ----------
+        // 1. behavior -> desired velocity
         if (enableFlee && target != null &&
             Vector3.Distance(Flat(transform.position), Flat(target.position)) < fleeRadius)
         {
@@ -104,33 +83,32 @@ public class SteeringAgent : MonoBehaviour
             currentState = BehaviorState.Wander;
         }
 
-        // ---------- 2. Obstacle Avoidance (selalu aktif, juga saat Wander) ----------
-        // Sensor mengarah ke arah gerak sekarang; kalau diam, ke arah desired.
+        // 2. obstacle avoidance, selalu jalan termasuk pas wander
+        // sensor ngarah ke arah gerak sekarang, kalo lagi diem pake arah desired
         Vector3 senseDir = velocity.sqrMagnitude > 0.01f ? velocity : desiredVelocity;
         avoidance = sensor.Sense(senseDir);
 
         if (avoidance.sqrMagnitude > 0.0001f)
         {
-            // Gaya hindaran diberi skala maxSpeed agar sebanding dengan desired,
-            // lalu dikalikan weight = seberapa "diprioritaskan" menghindar.
+            // avoidance dikali maxSpeed biar skalanya sebanding sama desired, terus dikali weight
             desiredVelocity += avoidance * maxSpeed * avoidanceWeight;
             desiredVelocity = Vector3.ClampMagnitude(desiredVelocity, maxSpeed);
             currentState = BehaviorState.Avoiding;
         }
 
-        // ---------- 3. Acceleration (efek inersia) ----------
+        // 3. acceleration, dibatesin maxAcceleration biar ga langsung belok tajem
         Vector3 steering = desiredVelocity - velocity;
         steering = Vector3.ClampMagnitude(steering, maxAcceleration * dt);
 
-        // ---------- 4. Velocity ----------
+        // 4. velocity
         velocity += steering;
         velocity.y = 0f;
         velocity = Vector3.ClampMagnitude(velocity, maxSpeed);
 
-        // ---------- 5. Movement ----------
+        // 5. gerak
         transform.position += velocity * dt;
 
-        // ---------- 6. Rotation ----------
+        // 6. rotasi ngadep arah gerak
         if (velocity.sqrMagnitude > 0.01f)
         {
             Quaternion look = Quaternion.LookRotation(velocity.normalized, Vector3.up);
@@ -140,32 +118,25 @@ public class SteeringAgent : MonoBehaviour
         ApplyColor();
     }
 
-    // ---------------- Behaviors ----------------
-
-    /// <summary>
-    /// Arrive: seperti Seek, tapi kecepatan diturunkan secara linear di dalam
-    /// Slow Radius dan menjadi nol di dalam Stop Radius.
-    /// </summary>
+    // arrive: kayak seek tapi di dalem slowRadius kecepatannya diturunin, di dalem stopRadius jadi 0
     Vector3 Arrive()
     {
         Vector3 toTarget = Flat(target.position) - Flat(transform.position);
         float distance = toTarget.magnitude;
 
-        if (distance <= stopRadius) return Vector3.zero;   // sudah sampai -> berhenti
+        if (distance <= stopRadius) return Vector3.zero; // udah nyampe
 
         float speed = maxSpeed;
         if (distance < slowRadius)
         {
-            // 0 di stopRadius, 1 di slowRadius
+            // t = 0 pas di stopRadius, 1 pas di slowRadius
             float t = (distance - stopRadius) / Mathf.Max(slowRadius - stopRadius, 0.001f);
             speed = maxSpeed * t;
         }
         return toTarget.normalized * speed;
     }
 
-    /// <summary>
-    /// Wander: pertahankan heading, setiap interval ubah heading dengan sudut acak.
-    /// </summary>
+    // wander: jalan lurus, tiap interval headingnya digeser random
     Vector3 Wander(float dt)
     {
         wanderTimer -= dt;
@@ -178,15 +149,13 @@ public class SteeringAgent : MonoBehaviour
         return dir * wanderSpeed;
     }
 
-    /// <summary>Flee: kebalikan Seek, lari menjauhi target dengan kecepatan penuh.</summary>
+    // flee: kebalikan seek, lari menjauh dari target
     Vector3 Flee()
     {
         Vector3 away = Flat(transform.position) - Flat(target.position);
         if (away.sqrMagnitude < 0.0001f) away = -transform.forward;
         return away.normalized * maxSpeed;
     }
-
-    // ---------------- Helpers ----------------
 
     static Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
 
@@ -204,19 +173,17 @@ public class SteeringAgent : MonoBehaviour
         rend.material.color = c;
     }
 
-    // ---------------- Gizmos ----------------
-
     void OnDrawGizmos()
     {
         Vector3 pos = transform.position + Vector3.up * 0.05f;
 
-        // Velocity (hijau) dan desired velocity (cyan)
+        // ijo = velocity, cyan = desired
         Gizmos.color = Color.green;
         Gizmos.DrawLine(pos, pos + velocity);
         Gizmos.color = Color.cyan;
         Gizmos.DrawLine(pos, pos + desiredVelocity);
 
-        // Avoidance (merah)
+        // merah = avoidance
         if (avoidance.sqrMagnitude > 0.0001f)
         {
             Gizmos.color = Color.red;
@@ -225,11 +192,12 @@ public class SteeringAgent : MonoBehaviour
 
         if (target != null)
         {
-            // Garis ke target (magenta)
+            // garis ke target, agak transparan kalo lagi ga dipake
             Gizmos.color = useTarget ? Color.magenta : new Color(1f, 0f, 1f, 0.25f);
             Gizmos.DrawLine(pos, target.position);
 
 #if UNITY_EDITOR
+            // lingkaran slow / stop / flee radius di sekitar target
             Vector3 tp = target.position + Vector3.up * 0.05f;
             UnityEditor.Handles.color = Color.yellow;
             UnityEditor.Handles.DrawWireDisc(tp, Vector3.up, slowRadius);

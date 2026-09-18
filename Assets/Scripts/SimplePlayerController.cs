@@ -1,18 +1,12 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// <summary>
-/// Menggerakkan Player dengan WASD / Arrow (Input System baru).
-/// Player memakai CharacterController supaya tidak menembus obstacle.
-/// </summary>
+// gerakin player pake wasd / arrow, pake CharacterController biar ga nembus obstacle
 [RequireComponent(typeof(CharacterController))]
 public class SimplePlayerController : MonoBehaviour
 {
     [Header("Movement")]
-    [Tooltip("Kecepatan gerak Player (unit/detik)")]
     public float moveSpeed = 5f;
-
-    [Tooltip("Kecepatan rotasi menghadap arah gerak")]
     public float turnSpeed = 10f;
 
     CharacterController controller;
@@ -26,11 +20,11 @@ public class SimplePlayerController : MonoBehaviour
     {
         Vector2 input = ReadInput();
         Vector3 move = new Vector3(input.x, 0f, input.y);
-        if (move.sqrMagnitude > 1f) move.Normalize();
+        if (move.sqrMagnitude > 1f) move.Normalize(); // biar diagonal ga lebih cepet
 
-        // SimpleMove sudah menerapkan gravitasi sederhana
-        controller.SimpleMove(move * moveSpeed);
+        controller.SimpleMove(move * moveSpeed); // gravitasi udah diurus SimpleMove
 
+        // muter ngadep arah jalan
         if (move.sqrMagnitude > 0.001f)
         {
             Quaternion look = Quaternion.LookRotation(move, Vector3.up);
@@ -38,6 +32,7 @@ public class SimplePlayerController : MonoBehaviour
         }
     }
 
+    // project ini pake input system baru jadi ga bisa Input.GetAxis
     static Vector2 ReadInput()
     {
         var kb = Keyboard.current;

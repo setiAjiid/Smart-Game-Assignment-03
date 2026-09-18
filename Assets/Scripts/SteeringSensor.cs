@@ -1,39 +1,24 @@
 using UnityEngine;
 
-/// <summary>
-/// Sensor obstacle berbasis SphereCast.
-/// SphereCast = Raycast yang "tebal": sebuah bola dengan radius tertentu
-/// ditembakkan ke depan, sehingga obstacle yang sedikit di samping garis
-/// tengah pun tetap terdeteksi (sesuai lebar badan NPC).
-/// </summary>
+// sensor obstacle pake spherecast
+// spherecast itu kayak raycast tapi tebel, jadi obstacle yg agak di samping tetep kena
 public class SteeringSensor : MonoBehaviour
 {
     [Header("Sensor")]
-    [Tooltip("Jarak maksimum deteksi obstacle di depan NPC")]
-    public float sensorDistance = 3f;
+    public float sensorDistance = 3f;     // seberapa jauh ngeliat ke depan
+    public float sensorRadius = 0.5f;     // samain sama radius badan npc
+    public LayerMask obstacleMask;        // layer yg dianggap obstacle
+    public float castHeight = 0.5f;       // offset tinggi titik awal cast dari pivot
 
-    [Tooltip("Radius bola SphereCast (samakan dengan ukuran badan NPC)")]
-    public float sensorRadius = 0.5f;
-
-    [Tooltip("Layer yang dianggap obstacle")]
-    public LayerMask obstacleMask;
-
-    [Tooltip("Tinggi titik awal cast dari pivot NPC")]
-    public float castHeight = 0.5f;
-
-    // Hasil deteksi frame terakhir (dibaca oleh SteeringAgent & Gizmos)
+    // hasil deteksi frame terakhir, dipake agent sama gizmos
     public bool HasObstacle { get; private set; }
     public RaycastHit LastHit { get; private set; }
     public Vector3 LastDirection { get; private set; } = Vector3.forward;
 
     Vector3 Origin => transform.position + Vector3.up * castHeight;
 
-    /// <summary>
-    /// Menembakkan SphereCast searah <paramref name="direction"/>.
-    /// Mengembalikan gaya hindaran (sudah dinormalisasi dan diberi bobot jarak):
-    /// - arah: menjauhi pusat obstacle, tegak lurus arah gerak
-    /// - besar: 0..1, makin dekat obstacle makin besar
-    /// </summary>
+    // tembak spherecast ke arah direction
+    // balikin vektor hindaran, arahnya menjauh dari obstacle, besarnya 0..1 (makin deket makin gede)
     public Vector3 Sense(Vector3 direction)
     {
         direction.y = 0f;
@@ -47,22 +32,22 @@ public class SteeringSensor : MonoBehaviour
             HasObstacle = true;
             LastHit = hit;
 
-            // Arah "menjauh": dari pusat obstacle ke titik tabrak, diratakan ke bidang XZ.
+            // arah dari tengah obstacle ke titik tabrak, diratain ke xz
             Vector3 away = hit.point - hit.collider.bounds.center;
             away.y = 0f;
 
-            // Ambil komponen yang tegak lurus arah gerak supaya NPC belok, bukan mundur.
+            // ambil yg tegak lurus arah gerak aja biar npc belok, bukan mundur
             Vector3 lateral = Vector3.ProjectOnPlane(away, direction);
 
-            // Kalau tabrak tepat di tengah (lateral ~ 0), pilih belok kanan.
+            // kalo kena pas di tengah lateralnya nol, ya udah belok kanan aja
             if (lateral.sqrMagnitude < 0.0001f)
                 lateral = Vector3.Cross(Vector3.up, direction);
 
-            // Tambahkan sedikit komponen normal permukaan agar tidak menempel dinding.
+            // tambahin dikit normal permukaan biar ga nempel di tembok
             Vector3 normal = hit.normal; normal.y = 0f;
             Vector3 avoidDir = (lateral.normalized + normal.normalized * 0.5f).normalized;
 
-            // Makin dekat obstacle, makin kuat (1 saat menempel, 0 di ujung sensor).
+            // makin deket makin kuat, 1 pas nempel, 0 pas di ujung sensor
             float urgency = 1f - Mathf.Clamp01(hit.distance / sensorDistance);
             return avoidDir * urgency;
         }
@@ -77,6 +62,7 @@ public class SteeringSensor : MonoBehaviour
         Vector3 dir = Application.isPlaying ? LastDirection : transform.forward;
         float len = (Application.isPlaying && HasObstacle) ? LastHit.distance : sensorDistance;
 
+        // oranye = aman, merah = ada obstacle
         Gizmos.color = HasObstacle ? Color.red : new Color(1f, 0.5f, 0f);
         Gizmos.DrawWireSphere(origin, sensorRadius);
         Gizmos.DrawLine(origin, origin + dir * len);
